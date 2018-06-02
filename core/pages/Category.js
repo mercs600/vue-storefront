@@ -1,5 +1,5 @@
 // 3rd party dependecies
-import toString from 'lodash-es/toString'
+// import toString from 'lodash-es/toString'
 
 // Core dependecies
 import config from 'config'
@@ -65,14 +65,15 @@ export default {
   },
   preAsyncData ({ store, route }) {
     console.log('preAsyncData query setup')
+
     store.state.category.current_product_query = {
       populateAggregations: true,
       store: store,
       route: route,
       current: 0,
       perPage: 50,
-      sort: config.entities.productList.sort,
       filters: config.products.defaultFilters,
+      sort: config.entities.productList.sort,
       includeFields: config.entities.optimize && global.$VS.isSSR ? config.entities.productList.includeFields : null,
       excludeFields: config.entities.optimize && global.$VS.isSSR ? config.entities.productList.excludeFields : null,
       append: false
@@ -81,6 +82,7 @@ export default {
   asyncData ({ store, route }) { // this is for SSR purposes to prefetch data
     return new Promise((resolve, reject) => {
       console.log('Entering asyncData for Category root ' + new Date())
+      // this.getURIParams(route.query)
       const defaultFilters = config.products.defaultFilters
       store.dispatch('category/list', { includeFields: config.entities.optimize && global.$VS.isSSR ? config.entities.category.includeFields : null }).then((categories) => {
         store.dispatch('attribute/list', { // load filter attributes for this specific category
@@ -89,9 +91,28 @@ export default {
         }).then((attrs) => {
           store.dispatch('category/single', { key: 'slug', value: route.params.slug }).then((parentCategory) => {
             let query = store.state.category.current_product_query
+            let chosen = {}
+            Object.keys(route.query).forEach((key) => {
+              let filter = route.query[key]
+              chosen[key] = {
+                attribute_code: key,
+                id: filter
+              }
+            })
+
             if (!query.searchProductQuery) {
               query = Object.assign(query, { searchProductQuery: baseFilterProductsQuery(parentCategory, defaultFilters) })
             }
+
+            if (Object.keys(chosen).length) {
+              let filterQr = buildFilterProductsQuery(parentCategory, chosen, defaultFilters)
+              const fsC = Object.assign({}, chosen)
+              query = Object.assign(query, {
+                searchProductQuery: filterQr,
+                configuration: fsC
+              })
+            }
+
             store.dispatch('category/products', query).then((subloaders) => {
               Promise.all(subloaders).then((results) => {
                 EventBus.$emitFilter('category-after-load', { store: store, route: route }).then((results) => {
@@ -142,37 +163,44 @@ export default {
         return this.$store.dispatch('category/products', currentQuery)
       }
     },
+    setURIParams () {
+      let params = {}
+      Object.values(this.filters.chosen).forEach((filter) => {
+        params[filter.attribute_code] = filter.id
+      })
+      this.$router.replace({query: params})
+    },
+    getURIParams (query) {
+      let filters = {}
+      Object.keys(query).forEach((key) => {
+        let filter = query[key]
+        filters[key] = {
+          attribute_code: key,
+          id: filter
+        }
+      })
+      return filters
+    },
     onFilterChanged (filterOption) {
-      this.pagination.current = 0
+      // this.pagination.current = 0
       if (this.filters.chosen[filterOption.attribute_code] && ((toString(filterOption.id) === toString(this.filters.chosen[filterOption.attribute_code].id)) || filterOption.id === this.filters.chosen[filterOption.attribute_code].id)) { // for price filter it's a string
         delete this.filters.chosen[filterOption.attribute_code]
       } else {
         this.filters.chosen[filterOption.attribute_code] = filterOption
       }
-
-      let filterQr = buildFilterProductsQuery(this.category, this.filters.chosen)
-
-      const fsC = Object.assign({}, this.filters.chosen) // create a copy because it will be used asynchronously (take a look below)
-      this.$store.state.category.current_product_query = Object.assign(this.$store.state.category.current_product_query, {
-        populateAggregations: false,
-        searchProductQuery: filterQr,
-        current: this.pagination.current,
-        perPage: this.pagination.perPage,
-        configuration: fsC,
-        append: false
-      })
-      this.$store.dispatch('category/products', this.$store.state.category.current_product_query).then((res) => {
-      }) // because already aggregated
+      this.setURIParams()
     },
     validateRoute () {
       let self = this
       let store = self.$store
       let route = self.$route
+      // this.getURIParams(route.query)
 
       let slug = route.params.slug
-      this.filters.chosen = {} // reset selected filters
-      this.$bus.$emit('filter-reset')
-
+      if (!route.query) {
+        this.filters.chosen = {} // reset selected filters
+        this.$bus.$emit('filter-reset')
+      }
       store.dispatch('category/single', { key: 'slug', value: slug }).then((category) => {
         if (!category) {
           self.$router.push('/')
@@ -181,9 +209,14 @@ export default {
           let searchProductQuery = baseFilterProductsQuery(store.state.category.current, config.products.defaultFilters)
           self.$bus.$emit('current-category-changed', store.state.category.current_path)
           let query = store.state.category.current_product_query
+          let filterQr = buildFilterProductsQuery(this.category, this.filters.chosen)
+          const fsC = Object.assign({}, this.filters.chosen)
           query = Object.assign(query, { // base prototype from the asyncData is being used here
             current: self.pagination.current,
+            populateAggregations: false,
+            searchProductQuery: filterQr,
             perPage: self.pagination.perPage,
+            configuration: fsC,
             store: this.$store,
             route: this.$route,
             append: false
