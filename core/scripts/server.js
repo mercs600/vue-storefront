@@ -78,7 +78,7 @@ app.get('*', (req, res) => {
     } else {
       // Render Error Page or Redirect
       // TODO: Add error page handler
-      res.status(500).end('500 | Internal Server Error')
+      res.redirect('/service-error')
       console.error(`Error during render : ${req.url}`)
       console.error(err)
     }

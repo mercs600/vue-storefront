@@ -7,6 +7,7 @@ import Static from 'theme/pages/Static.vue'
 import Checkout from 'theme/pages/Checkout.vue'
 import Compare from 'theme/pages/Compare.vue'
 import PageNotFound from 'theme/pages/PageNotFound.vue'
+import ServiceError from 'theme/pages/ServiceError.vue'
 import MyAccount from 'theme/pages/MyAccount.vue'
 import CustomCmsPage from 'theme/pages/CustomCmsPage.vue'
 import CmsData from '@vue-storefront/extension-magento2-cms/components/CmsData'
@@ -37,6 +38,7 @@ let routes = [
   { name: 'contact', path: '/contact', component: Static, props: {page: 'contact', title: 'Contact'} },
   { name: 'compare', path: '/compare', component: Compare, props: {title: 'Compare Products'} },
   { name: 'page-not-found', path: '/page-not-found', component: PageNotFound },
+  { name: 'service-error', path: '/service-error', component: ServiceError, meta: {layout: 'plain'} },
   { name: 'custom-cms-page', path: '/custom-cms-page', component: CustomCmsPage },
   { name: 'cms-page-sync', path: '/cms-page-sync', component: CmsData, props: {identifier: 'about-us', type: 'Page', sync: true} }
 ]
